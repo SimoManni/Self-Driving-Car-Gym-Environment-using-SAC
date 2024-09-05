@@ -1,9 +1,8 @@
 import matplotlib.pyplot as plt
-import numpy as np
 
 from settings import *
 from environment import RacingEnv
-from sac_torch import Agent
+from SAC import Agent
 
 
 
@@ -16,7 +15,7 @@ def plot_learning_curve(x, scores, figure_file):
     plt.savefig(figure_file)
 
 def train(n_episodes=200):
-    env = RacingEnv(SIM=True)
+    env = RacingEnv(multi_agent=True)
     agent = Agent(input_dim=env.observation_space.shape[0] * N_STATES, env=env, n_actions=env.action_space.shape[0])
 
     filename = 'learning.png'
@@ -71,6 +70,7 @@ def train(n_episodes=200):
 
     x = [i+1 for i in range(n_episodes)]
     plot_learning_curve(x, mean_score_history, figure_file)
+
 
 
 if __name__ == '__main__':

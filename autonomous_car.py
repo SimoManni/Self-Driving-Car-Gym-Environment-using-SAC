@@ -8,7 +8,7 @@ class AutonomousCar():
         self.active = True
 
         # Load image and resize
-        car_image = pygame.image.load('car.png')
+        car_image = pygame.image.load('images/car.png')
         self.image = pygame.transform.scale(car_image, (20, 40))
         self.original_image = self.image
         self.rect = self.image.get_rect()

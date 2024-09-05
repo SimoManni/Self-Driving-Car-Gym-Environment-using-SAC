@@ -2,38 +2,17 @@ import numpy as np
 import cv2
 
 ### Parameters ###
-
 WIDTH, HEIGHT = 800, 600
-
-# INIT_POS = (438, 508)
-# INIT_ANGLE = 90
-V_MAX = 7
-
 N_STATES = 3
+V_MAX = 7
 EXTENSION_FACTOR = 7
-FPS = 60
-DELTA_TIME = 1 / FPS
-V_MAX = 30
 
-TOTAL_GAMETIME = 1000
-N_EPISODES = 1
-
-ALPHA = 0.005
-GAMMA = 0.5
-EPSILON = 1.0
-EPSILON_END = 0.1
-EPSILON_DEC = 0.995
-BATCH_SIZE = 128
-
-MEM_SIZE = 1_000_000
-LR = 0.003
-GOAL_REWARD = 10
-LIFE_REWARD = 0
-PENALTY = 0
+# Change index 0-33 to change starting point of car in 'normal' configuration
+INDEX = 0
 
 ## Defition of barriers ##
 
-image = cv2.imread('track.png')
+image = cv2.imread('images/track.png')
 image = cv2.resize(image, (800, 600))
 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
@@ -55,15 +34,6 @@ approx_contours_inner = cv2.approxPolyDP(long_contours[-1], epsilon_inner, True)
 approx_contours_inner = np.squeeze(approx_contours_inner)
 
 BARRIERS = [approx_contours_outer, approx_contours_inner]
-
-# Draw the contours on the original image
-# cv2.drawContours(image, [BARRIERS[0]], -1, (0, 255, 0), 2)  # Outer contour in green
-# cv2.drawContours(image, [BARRIERS[1]], -1, (0, 0, 255), 2)  # Inner contour in red
-#
-# # Display the image with the contours
-# cv2.imshow('Track with Contours', image)
-# cv2.waitKey(0)
-# cv2.destroyAllWindows()
 
 
 ### Definition of checkpoints ###
@@ -195,7 +165,7 @@ LEFT2_CONFIG = {
 }
 
 # Normal configuration
-init_pos, init_angle, checkpoints = get_config(0)
+init_pos, init_angle, checkpoints = get_config(INDEX)
 
 NORMAL_CONFIGURATION = {
     'init_pos': init_pos,

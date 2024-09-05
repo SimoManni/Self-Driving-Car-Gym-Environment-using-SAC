@@ -47,7 +47,7 @@ class ReplayBuffer():
 # Estimates the expected return of a state-action pair Q(s,a)
 # Provides feedback to the Actor on which actions are expected to yield higher returns.
 class CriticNetwork(nn.Module):
-    def __init__(self, beta, input_dim, n_actions, fc1_dims=256, fc2_dims=256, name='critic', checkpt_dir='tmp/sac'):
+    def __init__(self, beta, input_dim, n_actions, fc1_dims=256, fc2_dims=256, name='critic', checkpt_dir='sac'):
         super(CriticNetwork, self).__init__()
         self.checkpoint_file = os.path.join(checkpt_dir, name + '_sac')
 
@@ -78,7 +78,7 @@ class CriticNetwork(nn.Module):
 # Estimates the expected return of being in a state V(s)
 # Needed to compute the policy's expected value, crucial for the entropy-augmented objective function used in SAC
 class ValueNetwork(nn.Module):
-    def __init__(self, beta, input_dim, fc1_dims=256, fc2_dims=256, name='value', checkpt_dir='tmp/sac'):
+    def __init__(self, beta, input_dim, fc1_dims=256, fc2_dims=256, name='value', checkpt_dir='sac'):
         super(ValueNetwork, self).__init__()
         self.checkpoint_file = os.path.join(checkpt_dir, name + '_sac')
 
@@ -110,7 +110,7 @@ class ValueNetwork(nn.Module):
 # During training, the Actor generates actions according to its policy, which are then evaluated by the Critic network
 # The goal of the Actor is to improve its policy based on feedback from the Critic to maximize the expected return
 class ActorNetwork(nn.Module):
-    def __init__(self, alpha, input_dim, max_action, fc1_dims=256, fc2_dims=256, n_actions=1, name='actor', checkpt_dir='tmp/sac'):
+    def __init__(self, alpha, input_dim, max_action, fc1_dims=256, fc2_dims=256, n_actions=1, name='actor', checkpt_dir='sac'):
         super(ActorNetwork, self).__init__()
         self.checkpoint_file = os.path.join(checkpt_dir, name + '_sac')
         self.max_action = T.tensor(max_action)
@@ -124,14 +124,6 @@ class ActorNetwork(nn.Module):
         self.optimizer = optim.Adam(self.parameters(), lr=alpha)
         self.device = T.device('cuda:0' if T.cuda.is_available() else 'cpu')
         self.to(self.device)
-
-    #     self.init_weights()
-    #
-    # def init_weights(self):
-    #     nn.init.xavier_uniform_(self.fc1.weight)
-    #     nn.init.xavier_uniform_(self.fc2.weight)
-    #     nn.init.xavier_uniform_(self.mu.weight)
-    #     nn.init.xavier_uniform_(self.sigma.weight)
 
     def forward(self, state):
         state = state.float()
@@ -219,7 +211,8 @@ class Agent():
             state = T.tensor(np.array([observation])).to(self.actor.device)
             actions, _ = self.actor.sample_normal(state, reparametrize=False)
             return actions.cpu().detach().numpy()[0]
-    def rememeber(self, state_array, action_array, reward_array, new_state_array, done_array):
+
+    def remember(self, state_array, action_array, reward_array, new_state_array, done_array):
         for state, action, reward, new_state, done in zip(state_array, action_array, reward_array, new_state_array, done_array):
             self.memory.store_transition(state, action, reward, new_state, done)
 
