@@ -4,11 +4,11 @@ import numpy as np
 import pygame
 from collections import deque
 
-from AutonomousCar import AutonomousCar
+from autonomous_car import AutonomousCar
 from settings import *
 
 class RacingEnv(gym.Env):
-    def __init__(self):
+    def __init__(self, multi_agent=True):
         """
         Must define self.observation_space and self.action_space
         """
@@ -35,21 +35,36 @@ class RacingEnv(gym.Env):
             dtype=np.float32
         )
 
+        self.SIM = multi_agent
 
-        self.car = AutonomousCar()
+        if self.SIM:
+            self.cars = []
+            for key in list(CONFIGURATIONS.keys()):
+                car = AutonomousCar(key)
+                self.cars.append(car)
 
+            if N_STATES > 1:
+                self.deques = []
+                for _ in range(len(self.cars)):
+                    self.deques.append(deque(maxlen=N_STATES-1))
+        else:
+            self.car = AutonomousCar('normal')
+            if N_STATES > 1:
+                self.prev_states = deque(maxlen=N_STATES-1)
 
         self.contour_points = BARRIERS
-
-        if N_STATES > 1:
-            self.prev_states = deque(maxlen=N_STATES-1)
 
         self.VIS_BARRIERS = True
         self.VIS_CHECKPOINTS = True
         self.VIS_PERCEPTION = True
-        self.car.VIS_PERCEPTION = self.VIS_PERCEPTION
 
-        track = pygame.image.load('track.png')
+        if self.SIM:
+            for car in self.cars:
+                car.VIS_PERCEPTION = self.VIS_PERCEPTION
+        else:
+            self.car.VIS_PERCEPTION = self.VIS_PERCEPTION
+
+        track = pygame.image.load('images/track.png')
         self.image = pygame.transform.scale(track, (WIDTH, HEIGHT))
 
     def reset(self):
@@ -57,56 +72,102 @@ class RacingEnv(gym.Env):
         Returns the observation of the initial state
         Resets the environment to initial state so that a new episode (independent of previous ones) can start
         """
-        self.car.reset()
-        init_state = self._get_state()
+        if self.SIM:
+            init_states = []
+            for i, car in enumerate(self.cars):
+                car.reset()
+                init_state = self._get_state(car)
+                init_states.append(np.tile(init_state, 3))
+                self.deques[i].clear()
+                self.deques[i].appendleft(init_state)
+                self.deques[i].appendleft(init_state)
 
-        self.prev_states.clear()
-        self.prev_states.appendleft(init_state)
-        self.prev_states.appendleft(init_state)
+            return np.array(init_states)
+        else:
+            self.car.reset()
+            init_state = self._get_state(self.car)
 
-        self.checkpoint_index = 0
+            self.prev_states.clear()
+            self.prev_states.appendleft(init_state)
+            self.prev_states.appendleft(init_state)
 
-        self.screen = None
-        self.agent = None
+            return np.tile(init_state, 3)
 
-        return np.tile(init_state, 3)
-
-    def step(self, action):
+    def step(self, actions):
         """
         Returns: next observation, reward, done and optionally additional info
         """
-        done = False
-        self.car.update(action)
-        reward = 0
-        passed_checkpoints = 0
+        if self.SIM:
+            new_state_list = []
+            reward_list = []
+            done_list = []
 
-        # Penalty for using throttle and brake at the same time
-        if action[0] != 0 and action[1] != 0:
-            reward -= 0.01 / (np.abs(action[0] - action[1]) + 0.01)
+            for car, action, prev_states in zip(self.cars, actions, self.deques):
+                done = False
+                if car.active:
+                    car.update(action)
+                    reward = 0
 
-        # Penalty for steering when the car is very slow or still
-        # if self.car.speed < 0.5:
-        #     reward -= np.abs(action[2]) * (1 - self.car.speed)
+                    # Penalty for using throttle and brake at the same time
+                    if action[0] != 0 and action[1] != 0:
+                        reward -= 0.01 / (np.abs(action[0] - action[1]) + 0.01)
 
-        # Check if car passes checkpoint
-        if self.car.checkpoint():
-            reward += 10
-            passed_checkpoints += 1
+                    if car.config != 'straight1' and car.config != 'straight2':
+                        # Penalty for steering when the car is very slow or still
+                        if car.speed < 0.5:
+                            reward -= 0.1 * np.abs(action[2]) * (1 - car.speed)
 
-        # Check if collision occurred
-        if self.car.check_collision():
-            reward += -50
-            done = True
+                    # Check if car passes checkpoint
+                    if car.checkpoint():
+                        reward += 10
 
-        # Reward for completing lap or reaching end or part
-        if passed_checkpoints == len(self.checkpoints):
-            reward += 100
-            done = True
+                    # Check if collision occurred
+                    if car.check_collision():
+                        reward += -50
+                        done = True
 
-        current_observation = self._get_state()
-        observation = np.concatenate((current_observation, np.array(self.prev_states).flatten()))
-        self.prev_states.appendleft(current_observation)
-        return observation, reward, done
+                    current_observation = self._get_state(car)
+                    observation = np.concatenate((current_observation, np.array(prev_states).flatten()))
+                    prev_states.appendleft(current_observation)
+
+                    new_state_list.append(observation)
+                    reward_list.append(reward)
+                    done_list.append(done)
+                else:
+                    reward = np.nan
+                if done:
+                    car.active = False
+                    continue
+
+            return np.array(new_state_list), np.array(reward_list), np.array(done_list)
+        else:
+            action = actions
+            done = False
+            self.car.update(action)
+            reward = 0
+
+            # Penalty for using throttle and brake at the same time
+            if action[0] != 0 and action[1] != 0:
+                reward -= 0.01 / (np.abs(action[0] - action[1]) + 0.01)
+
+            # Penalty for steering when the car is very slow or still
+            if self.car.speed < 0.5:
+                reward -= 0.1 * np.abs(action[2]) * (1 - self.car.speed)
+
+            # Check if car passes checkpoint
+            if self.car.checkpoint():
+                reward += 10
+
+            # Check if collision occurred
+            if self.car.check_collision():
+                reward += -50
+                done = True
+
+            current_observation = self._get_state(self.car)
+            observation = np.concatenate((current_observation, np.array(self.prev_states).flatten()))
+            self.prev_states.appendleft(current_observation)
+
+            return observation, reward, done
 
     def render(self, agent=None, time_limit=True):
         """
@@ -158,47 +219,11 @@ class RacingEnv(gym.Env):
         raise NotImplementedError
 
     # Additional functions
-    def _get_state(self):
+    def _get_state(self, car):
         # Normalize distances
         max_distances = self.observation_space.high[:-2]
-        distances = self.car.perceive() / max_distances
-        return np.concatenate((distances, [self.car.speed], [self.car.angle / 360]))
-
-    def _get_starting_position(self, index=None):
-        # Definition of starting points and angles
-        x1 = self.checkpoints[:, 0]
-        y1 = self.checkpoints[:, 1]
-        x2 = self.checkpoints[:, 2]
-        y2 = self.checkpoints[:, 3]
-        x_middle = (x1 + x2) / 2
-        y_middle = (y1 + y2) / 2
-
-        # Definition of starting points
-        starting_points = []
-        for i, (x_m, y_m) in enumerate(zip(x_middle, y_middle)):
-            index = (i + 1) % (len(x_middle))
-            x = (x_m + x_middle[index]) / 2
-            y = (y_m + y_middle[index]) / 2
-            starting_points.append([x, y])
-
-        STARTING_POINTS = np.roll(np.array(starting_points).astype(int), 1, axis=0)
-
-        # Definition of starting angles
-        angles = []
-        for i, (x_m, y_m) in enumerate(zip(x_middle, y_middle)):
-            index = (i + 1) % (len(x_middle))
-            angle = np.arctan2(y_middle[index] - y_m, x_middle[index] - x_m) * 180 / np.pi
-            corrected_angle = (270 - angle % 360) if angle % 360 < 270 else (angle % 360)
-            angles.append(corrected_angle)
-
-        STARTING_ANGLES = np.roll(np.array(angles).astype(int), 1)
-
-        # Wrap-around of checkpoints and definition of starting configuration
-        if index != 0:
-            self.checkpoints = np.vstack((self.checkpoints[index:], self.checkpoints[:index]))
-        elif index == 0:
-            self.checkpoints = self.checkpoints
-        return STARTING_POINTS[index], STARTING_ANGLES[index]
+        distances = car.perceive() / max_distances
+        return np.concatenate((distances, [car.speed], [car.angle / 360]))
 
     # Functions for visualization
     def _draw(self, screen):
