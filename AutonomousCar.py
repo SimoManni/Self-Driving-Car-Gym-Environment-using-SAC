@@ -5,6 +5,8 @@ from settings import *
 
 class AutonomousCar():
     def __init__(self, config):
+        self.active = True
+
         # Load image and resize
         car_image = pygame.image.load('car.png')
         self.image = pygame.transform.scale(car_image, (20, 40))
@@ -14,6 +16,7 @@ class AutonomousCar():
         # Configurations
         if config in CONFIGURATIONS:
             self.config = CONFIGURATIONS[config]
+            self.config_name = config
         else:
             raise ValueError(f"Configuration '{config}' not found.")
 
@@ -85,13 +88,13 @@ class AutonomousCar():
 
         self.corners = rotated_vertices
 
-    def reset(self, init_pos=None, init_angle=None):
-        # if (init_pos is None) or (init_angle is None):
+    def reset(self):
         self.rect.center = self.car_start_pos_original
         self.angle = self.angle_original
         self.speed = 0
         self.passed_checkpoints = 0
         self.laps = 0
+        self.active = True
 
     def check_collision(self):
         corners = np.array(self.corners, dtype='int32')

@@ -205,14 +205,23 @@ class Agent():
 
         self.update_network_parameters(tau=1)
 
-    def choose_action(self, observation):
-        state = T.tensor(np.array([observation])).to(self.actor.device)
-        actions, _ = self.actor.sample_normal(state, reparametrize=False)
-
-        return actions.cpu().detach().numpy()[0]
-
-    def rememeber(self, state, action, reward, new_state, done):
-        self.memory.store_transition(state, action, reward, new_state, done)
+    def choose_action(self, observation_array):
+        if len(observation_array.shape) > 1:
+            actions_array = []
+            for observation in observation_array:
+                state = T.tensor(np.array([observation])).to(self.actor.device)
+                actions, _ = self.actor.sample_normal(state, reparametrize=False)
+                actions = actions.cpu().detach().numpy()[0]
+                actions_array.append(actions)
+            return np.array(actions_array)
+        else:
+            observation = observation_array
+            state = T.tensor(np.array([observation])).to(self.actor.device)
+            actions, _ = self.actor.sample_normal(state, reparametrize=False)
+            return actions.cpu().detach().numpy()[0]
+    def rememeber(self, state_array, action_array, reward_array, new_state_array, done_array):
+        for state, action, reward, new_state, done in zip(state_array, action_array, reward_array, new_state_array, done_array):
+            self.memory.store_transition(state, action, reward, new_state, done)
 
     def update_network_parameters(self, tau=None):
         """

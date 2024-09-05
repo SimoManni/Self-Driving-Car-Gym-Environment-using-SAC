@@ -16,18 +16,11 @@ def plot_learning_curve(x, scores, figure_file):
     plt.savefig(figure_file)
 
 
-MAX_TIME_SECONDS = 10
-
-
-
 if __name__ == '__main__':
 
-    env = RacingEnv(config='normal')
+    env = RacingEnv(SIM=False)
     agent = Agent(input_dim=env.observation_space.shape[0] * N_STATES, env=env, n_actions=env.action_space.shape[0])
     agent.load_models()
-
-    filename = 'SAC_car.png'
-    figure_file = 'plots/' + filename
 
     score_history = []
     best_score = 0
