@@ -1,5 +1,3 @@
-import pygame
-import numpy as np
 import matplotlib.pyplot as plt
 
 from settings import *
